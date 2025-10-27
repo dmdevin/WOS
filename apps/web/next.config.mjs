@@ -7,15 +7,7 @@ const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Required for the Docker build
-  output: 'standalone',
-
-  // --- THE DEFINITIVE FIX ---
-  // Explicitly disable the conflicting styled-jsx compiler.
-  // This prevents Next.js from trying to use it during the static export phase.
-  compiler: {
-    styledJsx: false,
-  },
+  // THE FIX: The 'output: standalone' line is completely removed.
   
   // Whitelist local image uploads for the Next.js Image component
   images: {
