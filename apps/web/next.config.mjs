@@ -7,10 +7,17 @@ const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // THE FIX: Ensure 'standalone' output is configured for Docker.
+  // Required for the Docker build
   output: 'standalone',
 
-  // Preserve your existing images configuration to whitelist local upload URLs.
+  // --- THE DEFINITIVE FIX ---
+  // Explicitly disable the conflicting styled-jsx compiler.
+  // This prevents Next.js from trying to use it during the static export phase.
+  compiler: {
+    styledJsx: false,
+  },
+  
+  // Whitelist local image uploads for the Next.js Image component
   images: {
     remotePatterns: [
       {
@@ -22,7 +29,7 @@ const nextConfig = {
     ],
   },
 
-  // Preserve your existing, critical webpack alias configuration.
+  // Preserve the critical webpack alias configuration for path mapping
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
