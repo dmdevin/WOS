@@ -16,12 +16,8 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/db/prisma ./packages/db/prisma/
 
 # Install all monorepo dependencies.
+# The postinstall script (if present) will run.
 RUN npm install
-
-# --- THE DEFINITIVE FIX ---
-# Forcefully remove the problematic styled-jsx package from node_modules.
-# This prevents Next.js from attempting to use it during the build.
-RUN rm -rf node_modules/styled-jsx
 
 # Copy the rest of the source code
 COPY . .
@@ -39,6 +35,10 @@ ENV NODE_ENV=production
 # Install only the required OS library for Prisma's runtime
 RUN apk add --no-cache openssl
 
+# Create a non-root user for security
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
 # Copy only the necessary package.json files from the builder stage
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/apps/web/package.json ./apps/web/
@@ -52,8 +52,11 @@ RUN npm install --omit=dev --ignore-scripts
 COPY --from=builder /app/node_modules/.prisma/client ./node_modules/.prisma/client
 
 # Copy the built application output and public assets from the builder stage
-COPY --from=builder /app/apps/web/.next ./apps/web/.next
-COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next ./apps/web/.next
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+
+# Set the user to the non-root user
+USER nextjs
 
 EXPOSE 3000
 ENV PORT 3000
