@@ -6,15 +6,44 @@ import { createOrderSchema, orderItemSchema } from '@/lib/validators';
 
 type OrderItemInput = z.infer<typeof orderItemSchema>;
 
+// --- TYPE DEFINITIONS ---
+
+// Type for the list output (already correct)
 type OrderPayload = Prisma.OrderGetPayload<{
   include: { customer: true; orderItems: true };
 }>;
-
 export type OrderListOutput = (Omit<OrderPayload, 'totalPrice' | 'discount' | 'shippingCost'> & {
   totalPrice: number;
   discount: number;
   shippingCost: number;
 })[];
+
+// --- THE FIX: Define and export the explicit return type for the getById procedure ---
+type OrderByIdPayload = Prisma.OrderGetPayload<{
+  include: {
+    customer: true;
+    orderItems: {
+      include: {
+        productVersion: {
+          include: {
+            product: true;
+          }
+        }
+      }
+    }
+  }
+}>;
+export type OrderByIdOutput = Omit<OrderByIdPayload, 'totalPrice' | 'discount' | 'shippingCost' | 'orderItems'> & {
+  totalPrice: number;
+  discount: number;
+  shippingCost: number;
+  orderItems: (Omit<Prisma.OrderItemGetPayload<{
+    include: { productVersion: { include: { product: true } } }
+  }>, 'unitPrice'> & { unitPrice: number })[];
+};
+
+
+// --- ROUTER IMPLEMENTATION ---
 
 export const ordersRouter = createTRPCRouter({
   list: protectedWorkshopProcedure.query(async ({ ctx }): Promise<OrderListOutput> => {
@@ -32,9 +61,10 @@ export const ordersRouter = createTRPCRouter({
     }));
   }),
 
+  // --- THE FIX: Add the explicit return type to the query procedure ---
   getById: protectedWorkshopProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<OrderByIdOutput> => {
       const order = await ctx.prisma.order.findFirst({
         where: { id: input.id, workshopId: ctx.workshopId },
         include: { customer: true, orderItems: { include: { productVersion: { include: { product: true } } } } },
@@ -44,11 +74,18 @@ export const ordersRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND' });
       }
       
+      // Map over orderItems to convert unitPrice from Decimal to number
+      const itemsAsNumbers = order.orderItems.map(item => ({
+        ...item,
+        unitPrice: item.unitPrice.toNumber(),
+      }));
+
       return {
         ...order,
         totalPrice: order.totalPrice.toNumber(),
         discount: order.discount.toNumber(),
         shippingCost: order.shippingCost.toNumber(),
+        orderItems: itemsAsNumbers,
       };
     }),
 
