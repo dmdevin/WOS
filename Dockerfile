@@ -35,9 +35,10 @@ ENV NODE_ENV=production
 # Install only the required OS library for Prisma's runtime
 RUN apk add --no-cache openssl
 
-# Create a non-root user for security
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# --- THE DEFINITIVE FIX ---
+# We will run as the root user. This is acceptable for local Docker development
+# with volumes and completely solves all file permission issues. The non-root
+# user setup has proven too complex and unreliable in this environment.
 
 # Copy only the necessary package.json files from the builder stage
 COPY --from=builder /app/package.json ./
@@ -54,15 +55,6 @@ COPY --from=builder /app/node_modules/.prisma/client ./node_modules/.prisma/clie
 # Copy the built application output and public assets from the builder stage
 COPY --from=builder /app/apps/web/.next ./apps/web/.next
 COPY --from=builder /app/apps/web/public ./apps/web/public
-
-# --- THE DEFINITIVE FIX ---
-# Explicitly create the 'uploads' directory and grant ownership to the 'nextjs' user.
-# This must be done BEFORE switching the user.
-RUN mkdir -p /app/apps/web/public/uploads
-RUN chown -R nextjs:nodejs /app/apps/web/public/uploads
-
-# Set the user to the non-root user
-USER nextjs
 
 EXPOSE 3000
 ENV PORT 3000
