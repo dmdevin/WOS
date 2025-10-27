@@ -2,9 +2,9 @@
 
 import { api } from '@/trpc/react';
 import { Badge } from '@/components/ui/badge';
-import { type OrderListOutput } from '@/server/api/routers/orders';
+// We no longer need the specific OrderListOutput type here.
 
-type OrderInList = OrderListOutput[number];
+// Define the client-safe type for the stage
 type WorkflowStage = "PENDING" | "CUTTING" | "SKIVING" | "STITCHING" | "FINISHING" | "PACKING" | "SHIPPED";
 
 const stages: WorkflowStage[] = ["PENDING", "CUTTING", "SKIVING", "STITCHING", "FINISHING", "PACKING", "SHIPPED"];
@@ -20,8 +20,13 @@ const stageColors: { [key: string]: BadgeVariant } = {
   SHIPPED: 'destructive',
 };
 
+// --- THE FIX: Make the 'order' prop more generic ---
+// It now accepts any object as long as it has an 'id' and 'workflowStage'.
 interface WorkflowStageChangerProps {
-  order: OrderInList;
+  order: {
+    id: string;
+    workflowStage: WorkflowStage;
+  };
   workshopId: string;
 }
 

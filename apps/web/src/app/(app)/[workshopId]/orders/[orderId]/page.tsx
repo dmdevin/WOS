@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { WorkflowStageChanger } from '@/components/shared/WorkflowStageChanger';
+import { type OrderByIdOutput } from '@/server/api/routers/orders';
+
+type OrderDetail = OrderByIdOutput;
+type OrderItemDetail = OrderDetail['orderItems'][number];
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -35,9 +39,10 @@ export default function OrderDetailPage() {
             <CardHeader><CardTitle>Order Items</CardTitle></CardHeader>
             <CardContent>
               <ul className="divide-y">
-                {order.orderItems.map(item => (
+                {order.orderItems.map((item: OrderItemDetail) => (
                   <li key={item.id} className="py-2 flex justify-between">
                     <span>{item.productVersion.product.name} (x{item.quantity})</span>
+                    {/* The API now returns a number, so we can call .toFixed() safely */}
                     <span className="font-mono">${item.unitPrice.toFixed(2)}</span>
                   </li>
                 ))}
@@ -58,6 +63,7 @@ export default function OrderDetailPage() {
           <Card>
             <CardHeader><CardTitle>Production Stage</CardTitle></CardHeader>
             <CardContent>
+              {/* --- THE FIX: The 'order' object now correctly matches the expected props --- */}
               <WorkflowStageChanger order={order} workshopId={workshopId} />
             </CardContent>
           </Card>
