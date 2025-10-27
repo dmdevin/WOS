@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { PlusCircle, KanbanSquare } from 'lucide-react';
 import { type OrderListOutput } from '@/server/api/routers/orders';
 import { OrderForm } from './OrderForm';
-import { WorkflowStageChanger } from './WorkflowStageChanger';
+import { WorkflowStageChanger } from '@/components/shared/WorkflowStageChanger';
 import Link from 'next/link';
 
 type OrderInList = OrderListOutput[number];

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { WorkflowStageChanger } from '../WorkflowStageChanger';
+import { WorkflowStageChanger } from '@/components/shared/WorkflowStageChanger';
 
 export default function OrderDetailPage() {
   const params = useParams();
