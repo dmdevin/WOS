@@ -15,7 +15,8 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/db/package.json ./packages/db/
 COPY packages/db/prisma ./packages/db/prisma/
 
-# Install all monorepo dependencies. The postinstall script will run here correctly.
+# Install all monorepo dependencies.
+# The postinstall script (if present) will run.
 RUN npm install
 
 # Copy the rest of the source code
@@ -34,16 +35,13 @@ ENV NODE_ENV=production
 # Install only the required OS library for Prisma's runtime
 RUN apk add --no-cache openssl
 
-# --- THE FIX: We will run as the root user for local development to avoid volume permission issues ---
-# The lines creating and switching to the 'nextjs' user have been removed.
-
 # Copy only the necessary package.json files from the builder stage
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/apps/web/package.json ./apps/web/
 COPY --from=builder /app/packages/db/package.json ./packages/db/
 COPY --from=builder /app/package-lock.json ./
 
-# Install ONLY production dependencies, and skip any scripts
+# Install ONLY production dependencies, and skip any postinstall scripts.
 RUN npm install --omit=dev --ignore-scripts
 
 # Copy the generated Prisma Client and query engine from the builder stage
