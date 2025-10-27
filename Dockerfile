@@ -16,6 +16,7 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/db/prisma ./packages/db/prisma/
 
 # Install all monorepo dependencies.
+# The postinstall script (if present) will run.
 RUN npm install
 
 # Copy the rest of the source code
