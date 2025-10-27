@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:15
+    container_name: workshopos_db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: workshopos
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d workshopos"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: workshopos_web
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/workshopos
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=a-very-secret-secret-for-development
+    env_file:
+      - .env
+    volumes:
+      # --- THE FIX: This volume mount ensures uploaded files persist ---
+      - ./apps/web/public/uploads:/app/apps/web/public/uploads
+
+volumes:
+  postgres_data: {}

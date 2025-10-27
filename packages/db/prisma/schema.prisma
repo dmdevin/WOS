@@ -1,0 +1,300 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../../../node_modules/.prisma/client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- CORE MODELS ---
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique
+  name          String?
+  passwordHash  String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  workshops     UserWorkshop[]
+
+  // --- ADD THESE TWO LINES ---
+  feedback        Feedback[]
+  feedbackUpvotes FeedbackUpvote[]
+}
+
+model Workshop {
+  id            String          @id @default(cuid())
+  name          String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  users         UserWorkshop[]
+  materials     Material[]
+  tools         Tool[]
+  operations    Operation[]
+  products      Product[]
+  customers     Customer[]
+  orders        Order[]
+  pricingRules  PricingRule[]
+  settings      WorkshopSettings?
+  patterns      Pattern[]
+}
+
+model UserWorkshop {
+  userId      String
+  workshopId  String
+  role        UserRole @default(OWNER)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workshop    Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@id([userId, workshopId])
+}
+
+enum UserRole {
+  OWNER
+  MEMBER
+}
+
+model WorkshopSettings {
+  id            String      @id @default(cuid())
+  workshopId    String      @unique
+  workshop      Workshop    @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  laborRate     Decimal     @default(30.00)
+  overheadRate  Decimal     @default(0)
+  currency      String      @default("USD")
+  unitSystem    String      @default("imperial")
+}
+
+// --- MATERIALS & INVENTORY ---
+
+model Material {
+  id            String      @id @default(cuid())
+  workshopId    String
+  workshop      Workshop    @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  name          String
+  sku           String?
+  category      MaterialCategory
+  unitOfMeasure String
+  bomItems      BOMItem[]
+  stockLevel          Int       @default(0)
+  stockAlertThreshold Int       @default(0)
+  unitCost            Decimal   @default(0.00)
+  supplierName        String?
+  supplierUrl         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@unique([workshopId, name])
+}
+
+// --- THE FIX: Each enum value must be on its own line. ---
+enum MaterialCategory {
+  LEATHER
+  THREAD
+  HARDWARE
+  PACKAGING
+  TOOLS
+  CONSUMABLE
+  OTHER
+}
+
+// --- PRODUCTS & PROCESSES ---
+
+model Product {
+  id            String          @id @default(cuid())
+  workshopId    String
+  workshop      Workshop        @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  name          String
+  sku           String?
+  description   String?
+  sellingPrice  Decimal         @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  versions      ProductVersion[]
+  patternId     String?
+  pattern       Pattern?        @relation(fields: [patternId], references: [id], onDelete: SetNull)
+}
+
+model ProductVersion {
+  id            String      @id @default(cuid())
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  version       Int
+  notes         String?
+  estimatedLaborMinutes Int   @default(0)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  bomItems      BOMItem[]
+  routing       RouteStep[]
+  orderItems    OrderItem[]
+}
+
+model BOMItem {
+  id                String          @id @default(cuid())
+  productVersionId  String
+  productVersion    ProductVersion  @relation(fields: [productVersionId], references: [id], onDelete: Cascade)
+  materialId        String
+  material          Material        @relation(fields: [materialId], references: [id])
+  quantity          Decimal
+  scrapFactor       Decimal         @default(0.05)
+}
+
+model RouteStep {
+  id                String          @id @default(cuid())
+  productVersionId  String
+  productVersion    ProductVersion  @relation(fields: [productVersionId], references: [id], onDelete: Cascade)
+  stepNumber        Int
+  operationId       String
+  operation         Operation       @relation(fields: [operationId], references: [id])
+  estimatedTimeMin  Int
+  toolId            String?
+  tool              Tool?           @relation(fields: [toolId], references: [id])
+  workCenter        String?
+  notes             String?
+
+  @@unique([productVersionId, stepNumber])
+}
+
+model Operation {
+  id          String      @id @default(cuid())
+  workshopId  String
+  workshop    Workshop    @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  routeSteps  RouteStep[]
+
+  @@unique([workshopId, name])
+}
+
+model Tool {
+  id              String      @id @default(cuid())
+  workshopId      String
+  workshop        Workshop    @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  name            String
+  purchaseCost    Decimal
+  purchaseDate    DateTime
+  lifespanHours   Int
+  hourlyRate      Decimal?
+  routeSteps      RouteStep[]
+}
+
+// --- CUSTOMERS & ORDERS ---
+
+model Customer {
+  id          String    @id @default(cuid())
+  workshopId  String
+  workshop    Workshop  @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  orders      Order[]
+
+  @@unique([workshopId, name])
+}
+
+// --- THE FIX: Each enum value must be on its own line. ---
+enum WorkflowStage {
+  PENDING
+  CUTTING
+  SKIVING
+  STITCHING
+  FINISHING
+  PACKING
+  SHIPPED
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  workshopId      String
+  workshop        Workshop    @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  customerId      String
+  customer        Customer    @relation(fields: [customerId], references: [id])
+  orderNumber     String      @unique
+  workflowStage   WorkflowStage @default(PENDING)
+  totalPrice      Decimal
+  discount        Decimal     @default(0)
+  shippingCost    Decimal     @default(0)
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  orderItems      OrderItem[]
+}
+
+model OrderItem {
+  id               String          @id @default(cuid())
+  orderId          String
+  order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVersionId String
+  productVersion   ProductVersion  @relation(fields: [productVersionId], references: [id])
+  quantity         Int
+  unitPrice        Decimal
+}
+
+// --- MISC & PATTERNS ---
+
+model PricingRule {
+  id          String    @id @default(cuid())
+  workshopId  String
+  workshop    Workshop  @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  name        String
+  marginPct   Decimal
+  isActive    Boolean   @default(true)
+}
+
+model Pattern {
+  id          String   @id @default(cuid())
+  workshopId  String
+  name        String
+  description String?
+  tags        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workshop    Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  products    Product[]
+  files       PatternFile[]
+}
+
+model PatternFile {
+  id        String   @id @default(cuid())
+  patternId String
+  pattern   Pattern  @relation(fields: [patternId], references: [id], onDelete: Cascade)
+  fileUrl   String
+  fileType  String
+  fileName  String
+  createdAt DateTime @default(now())
+}
+
+model Feedback {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  category    String   // e.g., "Bug Report", "Feature Request", "General"
+  createdAt   DateTime @default(now())
+  
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  
+  upvotes     FeedbackUpvote[]
+}
+
+model FeedbackUpvote {
+  feedbackId String
+  feedback   Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+
+  @@id([feedbackId, userId])
+}
