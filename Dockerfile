@@ -16,7 +16,6 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/db/prisma ./packages/db/prisma/
 
 # Install all monorepo dependencies.
-# The postinstall script (if present) will run.
 RUN npm install
 
 # Copy the rest of the source code
@@ -52,8 +51,14 @@ RUN npm install --omit=dev --ignore-scripts
 COPY --from=builder /app/node_modules/.prisma/client ./node_modules/.prisma/client
 
 # Copy the built application output and public assets from the builder stage
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next ./apps/web/.next
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+COPY --from=builder /app/apps/web/.next ./apps/web/.next
+COPY --from=builder /app/apps/web/public ./apps/web/public
+
+# --- THE DEFINITIVE FIX ---
+# Explicitly create the 'uploads' directory and grant ownership to the 'nextjs' user.
+# This must be done BEFORE switching the user.
+RUN mkdir -p /app/apps/web/public/uploads
+RUN chown -R nextjs:nodejs /app/apps/web/public/uploads
 
 # Set the user to the non-root user
 USER nextjs
