@@ -1,13 +1,14 @@
 'use client';
 
+// --- CHANGE 1: Import useState and useEffect ---
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { api } from '@/trpc/react';
-import { FileText, Download } from 'lucide-react';
+// --- CHANGE 2: Import Image icon for better UI ---
+import { FileText, Download, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-// THE FIX: Import the explicit server-side type
 import { type PatternByIdOutput } from '@/server/api/routers/patterns';
 
-// THE FIX: Define the component's type from the imported server type
 type PatternFile = PatternByIdOutput['files'][number];
 
 export default function ViewPatternPage() {
@@ -17,37 +18,78 @@ export default function ViewPatternPage() {
   
   const { data: pattern, isLoading } = api.patterns.getById.useQuery({ workshopId, id: patternId });
 
+  // --- CHANGE 3: State to manage the currently displayed file ---
+  // We'll store the entire file object in state. It's initialized to null.
+  const [selectedFile, setSelectedFile] = useState<PatternFile | null>(null);
+
+  // --- CHANGE 4: Effect to set the initial selected file ---
+  // This runs when the `pattern` data is loaded. It sets the first file
+  // as the default view, but only if one doesn't exist already.
+  useEffect(() => {
+    if (pattern && pattern.files.length > 0 && !selectedFile) {
+      setSelectedFile(pattern.files[0]);
+    }
+  }, [pattern, selectedFile]);
+
+
   if (isLoading) return <div>Loading pattern...</div>;
   if (!pattern) return <div>Pattern not found.</div>;
 
-  const mainFile = pattern.files[0];
-
   return (
-    <div className="flex gap-8">
-      <div className="flex-grow h-[calc(100vh-10rem)] w-full flex flex-col items-center">
-        <h1 className="text-2xl font-bold mb-4">{pattern.name}</h1>
-        {mainFile && (
-          mainFile.fileType === 'image' ? (
-            <img src={mainFile.fileUrl} alt={pattern.name} className="max-h-full max-w-full object-contain"/>
+    <div className="flex flex-col md:flex-row gap-8">
+      {/* Main Preview Area */}
+      <div className="flex-grow h-[calc(100vh-12rem)] w-full flex flex-col items-center">
+        <h1 className="text-2xl font-bold mb-4 truncate max-w-full">{pattern.name}</h1>
+        
+        {/* --- CHANGE 5: Display the selectedFile from state, not the hardcoded first file --- */}
+        {selectedFile ? (
+          selectedFile.fileType === 'image' ? (
+            <img src={selectedFile.fileUrl} alt={pattern.name} className="max-h-full max-w-full object-contain"/>
           ) : (
-            <embed src={mainFile.fileUrl} type="application/pdf" className="h-full w-full"/>
+            <embed src={selectedFile.fileUrl} type="application/pdf" className="h-full w-full"/>
           )
+        ) : (
+          // A helpful placeholder if there are no files
+          <div className="h-full w-full flex items-center justify-center bg-muted rounded-md">
+            <p className="text-muted-foreground">No files in this pattern.</p>
+          </div>
         )}
       </div>
-      <div className="w-64 flex-shrink-0">
+
+      {/* Sidebar with File List */}
+      <div className="w-full md:w-80 flex-shrink-0">
         <h2 className="text-lg font-semibold">Details</h2>
-        <p className="text-sm text-muted-foreground mt-2">{pattern.description}</p>
+        <p className="text-sm text-muted-foreground mt-2">{pattern.description || 'No description.'}</p>
+        
         <h3 className="text-md font-semibold mt-4">Files ({pattern.files.length})</h3>
         <ul className="mt-2 space-y-2">
-          {/* THE FIX: Explicitly type the 'file' parameter */}
           {pattern.files.map((file: PatternFile) => (
-            <li key={file.id} className="flex items-center justify-between text-sm p-2 border rounded-md">
+            // --- CHANGE 6: Make the entire list item clickable to change the preview ---
+            <li 
+              key={file.id} 
+              onClick={() => setSelectedFile(file)}
+              className={`flex items-center justify-between text-sm p-2 border rounded-md cursor-pointer transition-colors hover:bg-muted/80 ${
+                // Highlight the currently selected file
+                selectedFile?.id === file.id ? 'bg-muted ring-2 ring-primary' : ''
+              }`}
+            >
               <div className="flex items-center gap-2 truncate">
-                <FileText className="h-4 w-4 flex-shrink-0"/>
+                {/* Use a different icon for images vs. PDFs */}
+                {file.fileType === 'image' 
+                  ? <ImageIcon className="h-4 w-4 flex-shrink-0 text-blue-500"/> 
+                  : <FileText className="h-4 w-4 flex-shrink-0 text-red-500"/>
+                }
                 <span className="truncate">{file.fileName}</span>
               </div>
               <Button variant="ghost" size="icon" asChild>
-                <a href={file.fileUrl} download={file.fileName}><Download className="h-4 w-4"/></a>
+                <a 
+                  href={file.fileUrl} 
+                  download={file.fileName}
+                  // Prevent the click from bubbling up to the `li` onClick
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Download className="h-4 w-4"/>
+                </a>
               </Button>
             </li>
           ))}
