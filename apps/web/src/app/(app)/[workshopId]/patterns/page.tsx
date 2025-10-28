@@ -5,7 +5,7 @@ import { api } from '@/trpc/react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlusCircle, FileText, Trash2, Pencil, Image as ImageIcon } from 'lucide-react';
+import { PlusCircle, FileText, Trash2, Pencil, Image as ImageIcon, FolderOpen } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import {
@@ -65,23 +65,36 @@ export default function PatternsPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filteredPatterns?.map((pattern) => {
-          const firstFile = pattern.files[0];
+          // --- THE DEFINITIVE FIX IS HERE ---
+          // Instead of just taking the first file, we actively search for the first
+          // file that has the fileType of 'image'.
+          const thumbnailFile = pattern.files.find(file => file.fileType === 'image');
+
           return (
             <Card key={pattern.id} className="flex flex-col">
               <CardHeader>
                 <CardTitle className="truncate">{pattern.name}</CardTitle>
               </CardHeader>
-              <CardContent className="h-48 flex items-center justify-center bg-gray-100 rounded-md flex-grow">
+              <CardContent className="h-48 flex items-center justify-center bg-muted/50 rounded-md flex-grow">
                 <Link href={`/${workshopId}/patterns/${pattern.id}/view`} className="h-full w-full flex items-center justify-center">
-                  {/* --- THE DEFINITIVE FIX: Replace <Image> with <img> --- */}
-                  {firstFile?.fileType === 'image' ? (
+                  
+                  {/* --- And now we use our new 'thumbnailFile' variable --- */}
+                  {/* If an image file was found, display it. */}
+                  {thumbnailFile ? (
                     <img 
-                      src={firstFile.fileUrl} 
+                      src={thumbnailFile.fileUrl} 
                       alt={pattern.name} 
                       className="object-contain h-full w-full"
                     />
                   ) : (
-                    <FileText className="h-16 w-16 text-gray-400" />
+                    // If no image file was found, check if there are any files at all.
+                    pattern.files.length > 0 ? (
+                      // If there are files (but no images), show the PDF/file icon.
+                      <FileText className="h-16 w-16 text-muted-foreground" />
+                    ) : (
+                      // If there are no files at all, show an empty folder icon.
+                      <FolderOpen className="h-16 w-16 text-muted-foreground" />
+                    )
                   )}
                 </Link>
               </CardContent>
