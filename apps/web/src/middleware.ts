@@ -1,48 +1,39 @@
-// This middleware protects routes that require authentication.
+// src/middleware.ts
 
-import { getToken } from 'next-auth/jwt';
 import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
 
 export default withAuth(
-  async function middleware(req) {
-    const token = await getToken({ req });
-    const isAuth = !!token;
+  // This function is now only called if the user is authenticated.
+  // Its only job is to redirect already-logged-in users away from auth pages.
+  function middleware(req) {
     const isAuthPage =
       req.nextUrl.pathname.startsWith('/login') ||
       req.nextUrl.pathname.startsWith('/register');
 
     if (isAuthPage) {
-      if (isAuth) {
-        // Redirect authenticated users from login/register to their workshops
-        return NextResponse.redirect(new URL('/workshops', req.url));
-      }
-      return null;
-    }
-
-    if (!isAuth) {
-      // Redirect unauthenticated users trying to access protected routes
-      let from = req.nextUrl.pathname;
-      if (req.nextUrl.search) {
-        from += req.nextUrl.search;
-      }
-      return NextResponse.redirect(
-        new URL(`/login?from=${encodeURIComponent(from)}`, req.url)
-      );
+      // User is already authenticated, redirect them to their main dashboard.
+      return NextResponse.redirect(new URL('/workshops', req.url));
     }
   },
   {
     callbacks: {
-      async authorized() {
-        // This is a work-around for a bug in next-auth.
-        // It forces the middleware to run on every page.
-        return true;
-      },
+      // This is the core of the protection logic.
+      // `withAuth` will only run the middleware if this returns true.
+      // If it returns false, `withAuth` will automatically redirect the
+      // unauthenticated user to the login page you define below.
+      authorized: ({ token }) => !!token,
+    },
+    // Tell next-auth where your login page is. This is used for the automatic redirect.
+    pages: {
+      signIn: '/login',
     },
   }
 );
 
 export const config = {
-  // Match all routes except for API, static files, and image optimization folders.
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  // This matcher defines which routes are protected and require authentication.
+  // We are explicitly protecting the /workshops and /patterns routes.
+  // The login and register pages are NOT in this list, so they remain public.
+  matcher: ['/workshops/:path*', '/patterns/:path*'],
 };
