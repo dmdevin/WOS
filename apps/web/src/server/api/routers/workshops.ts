@@ -9,11 +9,10 @@ export const workshopsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      // THE FIX: Thanks to our new type definition, `ctx.session.user.id` is now
-      // correctly typed and guaranteed to exist in a protectedProcedure.
       const userId = ctx.session.user.id;
       
-      return ctx.prisma.workshop.create({
+      // Step 1: Create the new workshop as before
+      const newWorkshop = await ctx.prisma.workshop.create({
         data: {
           name: input.name,
           users: {
@@ -27,10 +26,33 @@ export const workshopsRouter = createTRPCRouter({
           }
         },
       });
+
+      // --- THE DEFINITIVE FIX: Create a set of default operations for the new workshop ---
+      
+      // Define the standard operations every new workshop should have
+      const defaultOperations = [
+        { name: 'Cutting', description: 'Cutting leather panels from a hide.' },
+        { name: 'Skiving', description: 'Thinning the edges of leather pieces.' },
+        { name: 'Stitching', description: 'Assembling pieces with a sewing machine or by hand.' },
+        { name: 'Finishing', description: 'Burnishing edges, applying conditioner, etc.' },
+        { name: 'Packing', description: 'Preparing the finished product for shipment.' },
+        { name: 'Assembly', description: 'Attaching hardware or other components.' },
+      ];
+
+      // Use `createMany` to efficiently add all default operations in one database call
+      await ctx.prisma.operation.createMany({
+        data: defaultOperations.map(op => ({
+          ...op,
+          workshopId: newWorkshop.id, // Link each new operation to the workshop we just created
+        })),
+      });
+      // --- END OF FIX ---
+
+      // Step 2: Return the created workshop as before
+      return newWorkshop;
     }),
 
   list: protectedProcedure.query(async ({ ctx }): Promise<WorkshopListOutput> => {
-    // THE FIX: The same type-safe access is used here.
     const userId = ctx.session.user.id;
 
     const memberships = await ctx.prisma.userWorkshop.findMany({
