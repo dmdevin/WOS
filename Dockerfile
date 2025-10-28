@@ -52,6 +52,10 @@ RUN npm install --omit=dev --ignore-scripts
 # Copy the generated Prisma Client and query engine from the builder stage
 COPY --from=builder /app/node_modules/.prisma/client ./node_modules/.prisma/client
 
+# --- THE DEFINITIVE FIX: Copy the prisma schema to the runner ---
+# The migrate command needs this file to run in production.
+COPY --from=builder /app/packages/db/prisma ./packages/db/prisma/
+
 # Copy the built application output and public assets from the builder stage
 COPY --from=builder /app/apps/web/.next ./apps/web/.next
 COPY --from=builder /app/apps/web/public ./apps/web/public
